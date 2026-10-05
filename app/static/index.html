@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Klip Studio</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Editing bay: clip list on the left, phone-shaped preview in the middle, controls on the right. */
+:root{
+  --bg:#121417;--panel:#1b1e23;--panel2:#23272e;--line:#323843;--fg:#e9ecf1;--muted:#9099a8;
+  --accent:#ffb02e;--accent-ink:#1a1204;--danger:#ff6b5e;--ok:#5fd39a;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Figtree",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{font-family:var(--body);font-size:15px;line-height:1.45;padding:0 16px}
+.wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;display:grid;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px}
+h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;margin:0;cursor:pointer}
+h1 span{color:var(--accent)}
+h2{font-family:var(--display);font-weight:600;font-size:17px;margin:0}
+.sub{color:var(--muted);margin:0}
+button{font:600 14px var(--body);color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+button:hover{border-color:var(--muted)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.sm{padding:5px 9px;font-size:13px}
+input,select{font:500 14px var(--body);color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+input.tc{font-family:var(--mono);width:92px;font-variant-numeric:tabular-nums}
+input[type=range]{accent-color:var(--accent);padding:0}
+.panel{background:var(--panel);border-radius:12px;padding:14px;display:grid;gap:12px;align-content:start}
+
+/* Home */
+.drop{border:2px dashed var(--line);border-radius:14px;padding:56px 20px;display:grid;place-items:center;gap:10px;text-align:center;background:var(--panel);cursor:pointer}
+.drop.over{border-color:var(--accent)}
+.drop strong{font-family:var(--display);font-size:24px}
+.projects{display:grid;gap:8px;list-style:none;margin:0;padding:0}
+.projects li{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--panel);border-radius:10px;padding:10px 14px;cursor:pointer}
+.projects li:hover{background:var(--panel2)}
+.pill{font:600 12px var(--body);padding:2px 8px;border-radius:99px;background:var(--panel2);color:var(--muted)}
+.pill.ok{color:var(--ok)}.pill.err{color:var(--danger)}.pill.run{color:var(--accent)}
+
+/* Progress */
+.progress{display:grid;gap:14px;place-items:center;text-align:center;padding:60px 20px;background:var(--panel);border-radius:14px}
+.spin{width:36px;height:36px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+/* Editor */
+.editor{display:grid;grid-template-columns:300px minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width:1100px){.editor{grid-template-columns:minmax(0,1fr)}}
+.cliplist{display:grid;gap:8px;list-style:none;margin:0;padding:0;max-height:75vh;overflow:auto}
+.cl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;background:var(--panel2);border:1px solid transparent;border-radius:10px;padding:10px;cursor:pointer;text-align:left}
+.cl.sel{border-color:var(--accent)}
+.score{grid-row:span 2;width:42px;height:42px;border-radius:10px;display:grid;place-items:center;font:700 16px var(--mono);background:var(--bg)}
+.score.hi{color:var(--ok)}.score.mid{color:var(--accent)}.score.lo{color:var(--muted)}
+.cl b{font-weight:600;line-height:1.25}
+.cl small{color:var(--muted);font-family:var(--mono);font-size:12px}
+.stage{display:grid;gap:12px;justify-items:center}
+.phone{position:relative;background:#000;border-radius:18px;overflow:hidden;cursor:grab;touch-action:none;box-shadow:0 0 0 6px var(--panel2)}
+.phone video{position:absolute;max-width:none;pointer-events:none}
+.cap{position:absolute;left:8%;right:8%;text-align:center;pointer-events:none;line-height:1.15;transform:translateY(-100%)}
+.cap .w{display:inline-block;margin:0 .12em}
+.cap.kuning{font:800 var(--fs) var(--body);text-transform:uppercase;color:#fff;-webkit-text-stroke:calc(var(--fs)*.09) #000;paint-order:stroke fill}
+.cap.kuning .on{color:#ffe100}
+.cap.kotak{font:700 var(--fs) var(--body);color:#fff}
+.cap.kotak .w{background:rgba(0,0,0,.6);padding:.05em .2em;border-radius:.15em}
+.cap.kotak .on{color:#ffd966}
+.cap.minimal{font:500 var(--fs) var(--body);color:#fff;text-shadow:0 1px 3px #000}
+.transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
+.time{font:500 14px var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.scrub{position:relative;width:100%;height:36px;background:var(--panel2);border-radius:8px;cursor:pointer;touch-action:none}
+.scrub .rng{position:absolute;top:4px;bottom:4px;background:color-mix(in srgb,var(--accent) 30%,transparent);border:2px solid var(--accent);border-radius:6px}
+.scrub .h{position:absolute;top:-4px;bottom:-4px;width:12px;background:var(--accent);cursor:ew-resize;border-radius:4px}
+.scrub .ph{position:absolute;top:0;bottom:0;width:2px;background:var(--fg)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.field{display:grid;gap:6px}
+.field>label,.lbl{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;padding:7px 11px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.words{display:flex;flex-wrap:wrap;gap:4px;max-height:200px;overflow:auto}
+.words span{padding:2px 6px;border-radius:5px;background:var(--panel2);cursor:text;font-size:14px}
+.words span:hover{outline:1px solid var(--muted)}
+.reason{color:var(--muted);font-size:14px;margin:0}
+.title-in{font:700 17px var(--display);width:100%}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="home">Klip<span>.</span>Studio</h1>
+    <p class="sub">Upload video panjang, AI cari detik terbaik dan jadikan klip pendek menegak dengan caption.</p>
+  </header>
+
+  <!-- Home -->
+  <section id="vHome" class="wrap" style="padding:0">
+    <label class="drop" id="drop" for="file">
+      <strong>Letak video di sini</strong>
+      <span class="sub">atau klik untuk pilih fail. Podcast, temubual, live, vlog.</span>
+      <input type="file" id="file" accept="video/*" hidden>
+    </label>
+    <div id="upProg" class="sub" hidden></div>
+    <h2>Projek</h2>
+    <ul class="projects" id="projects"></ul>
+    <p class="sub" id="noProjects" hidden>Belum ada projek. Upload video pertama anda di atas.</p>
+  </section>
+
+  <!-- Analysing -->
+  <section id="vWait" class="progress" hidden>
+    <div class="spin"></div>
+    <h2 id="waitStep">Memproses</h2>
+    <p class="sub">Video sejam biasanya ambil beberapa minit. Anda boleh tutup halaman ini dan kembali nanti.</p>
+  </section>
+
+  <!-- Editor -->
+  <section id="vEdit" class="editor" hidden>
+    <aside class="panel">
+      <div class="row"><h2 id="clipCount">Klip</h2><span style="flex:1"></span><button class="sm" id="addClip">+ Klip baru</button></div>
+      <ol class="cliplist" id="cliplist"></ol>
+    </aside>
+
+    <div class="stage">
+      <div class="phone" id="phone">
+        <video id="vid" playsinline preload="auto"></video>
+        <div class="cap" id="cap"></div>
+      </div>
+      <div class="transport">
+        <button id="play">▶ Main klip</button>
+        <span class="time" id="time">00:00.0</span>
+      </div>
+      <div class="scrub" id="scrub"><div class="rng" id="rng"></div><div class="h" id="hS"></div><div class="h" id="hE"></div><div class="ph" id="ph"></div></div>
+      <p class="sub" style="font-size:13px">Seret video dalam bingkai untuk pilih siapa yang ditunjuk. Seret hujung oren untuk potong.</p>
+    </div>
+
+    <aside class="panel" id="side">
+      <input class="title-in" id="title" aria-label="Tajuk klip">
+      <p class="reason" id="reason"></p>
+      <div class="field"><span class="lbl">Bentuk video (semua klip)</span>
+        <span class="seg" id="aspects"><button data-a="9:16">9:16</button><button data-a="1:1">1:1</button><button data-a="4:5">4:5</button><button data-a="16:9">16:9</button></span></div>
+      <div class="field"><span class="lbl">Masa</span>
+        <div class="row">Mula <input class="tc" id="tS"> <button class="sm" data-n="s,-0.5">−</button><button class="sm" data-n="s,0.5">+</button></div>
+        <div class="row">Tamat <input class="tc" id="tE"> <button class="sm" data-n="e,-0.5">−</button><button class="sm" data-n="e,0.5">+</button></div>
+      </div>
+      <div class="field"><span class="lbl">Frame</span>
+        <div class="row" id="people"></div>
+        <div class="row">Zum <input type="range" id="zoom" min="1" max="3" step="0.05" style="flex:1"></div>
+      </div>
+      <div class="field"><span class="lbl">Caption</span>
+        <div class="row"><label class="row"><input type="checkbox" id="capOn"> Papar</label><select id="capStyle"></select></div>
+        <div class="row">Kedudukan <input type="range" id="capPos" min="0.3" max="0.92" step="0.01" style="flex:1"></div>
+        <span class="sub" style="font-size:13px">Klik perkataan untuk betulkan ejaan.</span>
+        <div class="words" id="words"></div>
+      </div>
+      <div class="row"><button class="primary" id="renderBtn">Render klip</button><button id="delClip" style="color:var(--danger)">Padam</button></div>
+      <div id="renderOut" class="sub"></div>
+    </aside>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const vid=$('#vid'),phone=$('#phone');
+let P=null,cur=null,styles={},saveT=null,pollT=null,stopAt=null;
+const ASPECT={'9:16':9/16,'1:1':1,'4:5':.8,'16:9':16/9};
+const fmt=t=>{t=Math.max(0,t||0);const m=Math.floor(t/60);return String(m).padStart(2,'0')+':'+(t-m*60).toFixed(1).padStart(4,'0')};
+const parse=v=>{const p=String(v).trim().replace(',','.').split(':').map(Number);return p.some(isNaN)?NaN:p.reduce((a,b)=>a*60+b,0)};
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2800)}
+async function api(path,opt={}){const r=await fetch(path,opt);if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.statusText);return r.json()}
+function show(v){['vHome','vWait','vEdit'].forEach(id=>$('#'+id).hidden=id!==v)}
+
+/* ---------- routing ---------- */
+async function route(){
+  clearTimeout(pollT);
+  const id=location.hash.slice(1);
+  if(!id){show('vHome');loadProjects();return}
+  try{P=await api('/api/projects/'+id)}catch(e){toast('Projek tidak dijumpai.');location.hash='';return}
+  if(P.status==='ready')openEditor();
+  else if(P.status==='error'){show('vWait');$('#waitStep').textContent=P.step;$('.spin').hidden=true}
+  else{show('vWait');$('.spin').hidden=false;$('#waitStep').textContent=P.step||'Memproses';pollT=setTimeout(route,2000)}
+}
+window.addEventListener('hashchange',route);
+$('#home').onclick=()=>location.hash='';
+
+async function loadProjects(){
+  const list=await api('/api/projects');const ul=$('#projects');ul.innerHTML='';
+  $('#noProjects').hidden=list.length>0;
+  list.forEach(p=>{const li=document.createElement('li');
+    const st={ready:['ok','Siap'],error:['err','Gagal']}[p.status]||['run','Diproses'];
+    li.innerHTML=`<b></b><span class="pill ${st[0]}">${st[1]}</span><span class="sub">${p.clips} klip${p.duration?' · '+fmt(p.duration):''}</span>`;
+    li.querySelector('b').textContent=p.name;li.onclick=()=>location.hash=p.id;ul.appendChild(li)});
+}
+
+/* ---------- upload ---------- */
+function upload(file){
+  if(!file)return;
+  const fd=new FormData();fd.append('file',file);
+  const x=new XMLHttpRequest();x.open('POST','/api/projects');
+  const pr=$('#upProg');pr.hidden=false;
+  x.upload.onprogress=e=>pr.textContent=`Memuat naik ${file.name}: ${Math.round(e.loaded/e.total*100)}%`;
+  x.onload=()=>{pr.hidden=true;if(x.status===200)location.hash=JSON.parse(x.responseText).id;else toast('Upload gagal.')};
+  x.onerror=()=>{pr.hidden=true;toast('Upload gagal. Semak sambungan.')};
+  x.send(fd);
+}
+$('#file').onchange=e=>upload(e.target.files[0]);
+const drop=$('#drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>upload(e.dataTransfer.files[0]));
+
+/* ---------- editor ---------- */
+async function openEditor(){
+  show('vEdit');
+  if(!Object.keys(styles).length)styles=await api('/api/styles');
+  $('#capStyle').innerHTML=Object.entries(styles.captions).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  if(vid.dataset.src!==P.video){vid.src=P.video;vid.dataset.src=P.video}
+  cur=P.clips[0]||null;renderList();selectClip(cur);
+  pollRenders();
+}
+function renderList(){
+  const ol=$('#cliplist');ol.innerHTML='';
+  $('#clipCount').textContent=`Klip (${P.clips.length})`;
+  P.clips.forEach(c=>{const li=document.createElement('li');li.className='cl'+(c===cur?' sel':'');
+    const s=c.score??0,cls=s>=80?'hi':s>=60?'mid':'lo';
+    li.innerHTML=`<span class="score ${cls}">${c.score??'–'}</span><b></b><small>${fmt(c.start)} · ${(c.end-c.start).toFixed(0)}s${c.render?.status==='done'?' · ✓ render':''}</small>`;
+    li.querySelector('b').textContent=c.title||'Tanpa tajuk';
+    li.onclick=()=>selectClip(c);ol.appendChild(li)});
+}
+function selectClip(c){
+  cur=c;stopAt=null;vid.pause();
+  $('#side').hidden=!c;
+  document.querySelectorAll('.cl').forEach((el,i)=>el.classList.toggle('sel',P.clips[i]===c));
+  if(!c)return;
+  $('#title').value=c.title||'';$('#reason').textContent=c.reason||'';
+  $('#capOn').checked=c.captions!==false;$('#capStyle').value=c.captionStyle||'kuning';$('#capPos').value=c.captionPos??.78;
+  $('#zoom').value=c.crop?.z||1;
+  syncTimes();renderPeople();renderWords();renderOut();
+  if(vid.readyState>0)vid.currentTime=c.start;else vid.addEventListener('loadedmetadata',()=>{vid.currentTime=c.start;layout()},{once:true});
+  layout();
+}
+function syncTimes(){$('#tS').value=fmt(cur.start);$('#tE').value=fmt(cur.end)}
+function renderPeople(){
+  const ppl=cur.crop?.people||[];
+  $('#people').innerHTML=ppl.length>1?ppl.map((x,i)=>`<button class="sm" data-x="${x}">Orang ${i+1}${x<.4?' (kiri)':x>.6?' (kanan)':''}</button>`).join(''):'<span class="sub" style="font-size:13px">Seret video untuk ubah frame.</span>';
+  $('#people').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{cur.crop.cx=+b.dataset.x;layout();dirty()});
+}
+function clipWords(){return P.words.map((w,i)=>({...w,i})).filter(w=>w.e>cur.start&&w.s<cur.end)}
+function renderWords(){
+  const box=$('#words');box.innerHTML='';
+  clipWords().forEach(w=>{const s=document.createElement('span');s.textContent=w.w;s.title=fmt(w.s);
+    s.onclick=()=>{vid.currentTime=w.s;const inp=document.createElement('input');inp.value=w.w;inp.style.width=Math.max(4,w.w.length+2)+'ch';s.replaceWith(inp);inp.focus();inp.select();
+      const done=async()=>{const t=inp.value.trim();if(t&&t!==w.w){P.words[w.i].w=t;try{await api(`/api/projects/${P.id}/words`,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({index:w.i,text:t})})}catch(e){toast(e.message)}}renderWords()};
+      inp.onblur=done;inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=w.w;inp.blur()}}};
+    box.appendChild(s)});
+}
+
+/* preview geometry: crop box in source pixels -> CSS transform of the video inside the phone */
+function cropRect(){
+  const W=vid.videoWidth||P.width,H=vid.videoHeight||P.height,ar=ASPECT[P.aspect||'9:16'];
+  const cr=cur.crop||(cur.crop={cx:.5,cy:.5,z:1});
+  let bw,bh;if(W/H>ar){bh=H;bw=H*ar}else{bw=W;bh=W/ar}
+  bw/=cr.z;bh/=cr.z;
+  const x=clamp(cr.cx*W-bw/2,0,W-bw),y=clamp(cr.cy*H-bh/2,0,H-bh);
+  cr.cx=(x+bw/2)/W;cr.cy=(y+bh/2)/H;return {x,y,w:bw,h:bh,W,H};
+}
+function layout(){
+  if(!cur||!P.width)return;
+  const ar=ASPECT[P.aspect||'9:16'];
+  phone.style.aspectRatio=ar;phone.style.width=`min(100%, calc(${ar} * min(70vh, 640px)))`;
+  const r=cropRect(),ph=phone.clientHeight,s=ph/r.h;
+  vid.style.width=r.W*s+'px';vid.style.height=r.H*s+'px';vid.style.left=-r.x*s+'px';vid.style.top=-r.y*s+'px';
+  const cap=$('#cap');cap.className='cap '+(cur.captionStyle||'kuning');
+  const fsk={kuning:.062,kotak:.05,minimal:.045}[cur.captionStyle||'kuning'];
+  cap.style.setProperty('--fs',ph*fsk*(ar>1?1.5:1)+'px');cap.style.top=(cur.captionPos??.78)*100+'%';
+  document.querySelectorAll('#aspects button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.a===(P.aspect||'9:16')));
+  drawScrub();
+}
+window.addEventListener('resize',layout);
+
+/* captions preview, mirrors render.py grouping */
+function drawCaption(t){
+  const cap=$('#cap');
+  if(!cur||cur.captions===false){cap.innerHTML='';return}
+  const n={kuning:3,kotak:4,minimal:6}[cur.captionStyle||'kuning'],ws=clipWords();
+  const k=ws.findIndex((w,i)=>t>=w.s&&t<(ws[i+1]?ws[i+1].s:w.e+.15));
+  if(k<0){cap.innerHTML='';return}
+  const g=Math.floor(k/n)*n;
+  cap.innerHTML=ws.slice(g,g+n).map((w,i)=>`<span class="w${g+i===k&&cur.captionStyle!=='minimal'?' on':''}"></span>`).join('');
+  cap.querySelectorAll('.w').forEach((el,i)=>el.textContent=ws[g+i].w);
+}
+
+/* scrub bar shows the clip with 10 s of context each side */
+function win(){const pad=Math.max(10,(cur.end-cur.start)*.3);return [Math.max(0,cur.start-pad),Math.min(P.duration,cur.end+pad)]}
+function drawScrub(){
+  if(!cur)return;const [a,b]=win(),pct=t=>(t-a)/(b-a)*100+'%';
+  $('#rng').style.left=pct(cur.start);$('#rng').style.width=(cur.end-cur.start)/(b-a)*100+'%';
+  $('#hS').style.left=`calc(${pct(cur.start)} - 6px)`;$('#hE').style.left=`calc(${pct(cur.end)} - 6px)`;
+}
+function tick(){
+  if(cur){const t=vid.currentTime;$('#time').textContent=`${fmt(t)} · klip ${fmt(cur.start)} – ${fmt(cur.end)}`;
+    const [a,b]=win();$('#ph').style.left=clamp((t-a)/(b-a),0,1)*100+'%';drawCaption(t);
+    if(stopAt!=null&&t>=stopAt){vid.pause();stopAt=null;vid.currentTime=cur.start}}
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+$('#play').onclick=()=>{if(!vid.paused){vid.pause();return}if(vid.currentTime<cur.start||vid.currentTime>=cur.end)vid.currentTime=cur.start;stopAt=cur.end;vid.play()};
+vid.addEventListener('play',()=>$('#play').textContent='❚❚ Jeda');vid.addEventListener('pause',()=>$('#play').textContent='▶ Main klip');
+
+{ // scrub interactions
+  const sc=$('#scrub');let d=null;
+  sc.addEventListener('pointerdown',e=>{const r=sc.getBoundingClientRect(),[a,b]=win();d={r,a,b,mode:e.target.id==='hS'?'s':e.target.id==='hE'?'e':'seek'};sc.setPointerCapture(e.pointerId);move(e)});
+  sc.addEventListener('pointermove',e=>d&&move(e));
+  const move=e=>{const t=d.a+clamp((e.clientX-d.r.left)/d.r.width,0,1)*(d.b-d.a);
+    if(d.mode==='s')cur.start=+Math.min(t,cur.end-1).toFixed(2);else if(d.mode==='e')cur.end=+Math.max(t,cur.start+1).toFixed(2);
+    vid.currentTime=t;if(d.mode!=='seek'){drawScrub();syncTimes()}};
+  const up=()=>{if(d&&d.mode!=='seek'){renderWords();dirty();renderList()}d=null};
+  sc.addEventListener('pointerup',up);sc.addEventListener('pointercancel',up);
+}
+{ // drag the picture inside the phone to reframe
+  let d=null;
+  phone.addEventListener('pointerdown',e=>{if(!cur)return;const r=cropRect();d={x:e.clientX,y:e.clientY,cx:cur.crop.cx,cy:cur.crop.cy,s:phone.clientHeight/r.h,W:r.W,H:r.H};phone.setPointerCapture(e.pointerId)});
+  phone.addEventListener('pointermove',e=>{if(!d)return;cur.crop.cx=d.cx-(e.clientX-d.x)/d.s/d.W;cur.crop.cy=d.cy-(e.clientY-d.y)/d.s/d.H;layout()});
+  const up=()=>{if(d)dirty();d=null};phone.addEventListener('pointerup',up);phone.addEventListener('pointercancel',up);
+}
+
+/* field bindings */
+$('#title').oninput=e=>{cur.title=e.target.value;dirty();clearTimeout($('#title').t);$('#title').t=setTimeout(renderList,400)};
+['tS','tE'].forEach(id=>$('#'+id).onchange=e=>{const v=parse(e.target.value);
+  if(isNaN(v)){toast('Format masa: 01:23.4');syncTimes();return}
+  if(id==='tS')cur.start=clamp(v,0,cur.end-1);else cur.end=clamp(v,cur.start+1,P.duration);
+  vid.currentTime=id==='tS'?cur.start:cur.end;syncTimes();drawScrub();renderWords();renderList();dirty()});
+document.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{const [k,d]=b.dataset.n.split(',');
+  if(k==='s')cur.start=+clamp(cur.start+ +d,0,cur.end-1).toFixed(2);else cur.end=+clamp(cur.end+ +d,cur.start+1,P.duration).toFixed(2);
+  vid.currentTime=k==='s'?cur.start:cur.end;syncTimes();drawScrub();renderWords();renderList();dirty()});
+$('#zoom').oninput=e=>{cur.crop.z=+e.target.value;layout();dirty()};
+$('#capOn').onchange=e=>{cur.captions=e.target.checked;dirty()};
+$('#capStyle').onchange=e=>{cur.captionStyle=e.target.value;layout();dirty()};
+$('#capPos').oninput=e=>{cur.captionPos=+e.target.value;layout();dirty()};
+document.querySelectorAll('#aspects button').forEach(b=>b.onclick=()=>{P.aspect=b.dataset.a;layout();dirty()});
+$('#addClip').onclick=()=>{const t=vid.currentTime||0;
+  const c={id:Math.random().toString(16).slice(2,10),title:'Klip baru',reason:'Ditambah sendiri.',score:null,start:+t.toFixed(2),end:+Math.min(P.duration,t+30).toFixed(2),crop:{...(cur?.crop||{cx:.5,cy:.5,z:1})},captions:true,captionStyle:cur?.captionStyle||'kuning',captionPos:cur?.captionPos??.78,render:null};
+  P.clips.push(c);renderList();selectClip(c);dirty()};
+$('#delClip').onclick=()=>{const b=$('#delClip');
+  if(b.dataset.confirm!=='1'){b.dataset.confirm='1';b.textContent='Tekan sekali lagi untuk padam';setTimeout(()=>{b.dataset.confirm='';b.textContent='Padam'},3000);return}
+  b.dataset.confirm='';b.textContent='Padam';P.clips.splice(P.clips.indexOf(cur),1);renderList();selectClip(P.clips[0]||null);dirty()};
+
+function dirty(){clearTimeout(saveT);saveT=setTimeout(saveClips,600)}
+async function saveClips(){try{await api(`/api/projects/${P.id}/clips`,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({clips:P.clips,aspect:P.aspect})})}catch(e){toast('Gagal simpan: '+e.message)}}
+
+/* rendering */
+$('#renderBtn').onclick=async()=>{clearTimeout(saveT);await saveClips();
+  try{await api(`/api/projects/${P.id}/clips/${cur.id}/render`,{method:'POST'});cur.render={status:'rendering'};renderOut();pollRenders()}catch(e){toast(e.message)}};
+function renderOut(){
+  const o=$('#renderOut'),r=cur?.render;$('#renderBtn').disabled=r?.status==='rendering';
+  if(!r){o.textContent='';return}
+  if(r.status==='rendering')o.textContent='Sedang render…';
+  else if(r.status==='error')o.textContent='Render gagal: '+r.error;
+  else o.innerHTML=`<a href="${r.url}?v=${Date.now()}" download>Muat turun MP4</a> · <a href="${r.url}" target="_blank" rel="noopener">Tonton</a>`;
+}
+async function pollRenders(){
+  clearTimeout(pollRenders.t);
+  if(!P.clips.some(c=>c.render?.status==='rendering'))return;
+  pollRenders.t=setTimeout(async()=>{
+    const fresh=await api('/api/projects/'+P.id);
+    fresh.clips.forEach(f=>{const c=P.clips.find(x=>x.id===f.id);if(c)c.render=f.render});
+    renderOut();renderList();pollRenders();
+  },1500);
+}
+route();
+</script>
+</body>
+</html>
